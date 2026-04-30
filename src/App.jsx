@@ -30,8 +30,7 @@ const INITIAL_DATA = {
 const EventixApp = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [data, setData] = useState(INITIAL_DATA);
-  const [showModal, setShowModal] = useState(false);
-  const [editingId, setEditingId] = useState(null);
+  const [confirmModal, setConfirmModal] = useState({ show: false, onConfirm: null, message: '' });
 
   // Charger données du localStorage au démarrage
   useEffect(() => {
@@ -56,14 +55,52 @@ const EventixApp = () => {
       
       <main className="max-w-7xl mx-auto px-4 py-8">
         {activeTab === 'dashboard' && <DashboardView data={data} />}
-        {activeTab === 'prospects' && <ProspectsView data={data} setData={setData} />}
+        {activeTab === 'prospects' && <ProspectsView data={data} setData={setData} confirmModal={confirmModal} setConfirmModal={setConfirmModal} />}
         {activeTab === 'pipeline' && <PipelineView data={data} setData={setData} />}
         {activeTab === 'calendar' && <CalendarView data={data} />}
-        {activeTab === 'settings' && <SettingsView setData={setData} />}
+        {activeTab === 'settings' && <SettingsView setData={setData} confirmModal={confirmModal} setConfirmModal={setConfirmModal} />}
       </main>
+
+      {/* Modal de Confirmation */}
+      {confirmModal.show && (
+        <ConfirmModal 
+          message={confirmModal.message}
+          onConfirm={() => {
+            confirmModal.onConfirm();
+            setConfirmModal({ show: false, onConfirm: null, message: '' });
+          }}
+          onCancel={() => setConfirmModal({ show: false, onConfirm: null, message: '' })}
+        />
+      )}
     </div>
   );
 };
+
+// ============================================================================
+// MODAL DE CONFIRMATION
+// ============================================================================
+
+const ConfirmModal = ({ message, onConfirm, onCancel }) => (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="bg-white rounded-xl p-6 max-w-sm mx-4 shadow-xl">
+      <p className="text-slate-900 mb-6">{message}</p>
+      <div className="flex gap-3">
+        <button
+          onClick={onConfirm}
+          className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+        >
+          Confirmer
+        </button>
+        <button
+          onClick={onCancel}
+          className="flex-1 px-4 py-2 bg-slate-300 text-slate-900 rounded-lg hover:bg-slate-400"
+        >
+          Annuler
+        </button>
+      </div>
+    </div>
+  </div>
+);
 
 // ============================================================================
 // NAVIGATION
@@ -184,7 +221,7 @@ const DashboardView = ({ data }) => {
 // PROSPECTS VIEW - CRUD COMPLET
 // ============================================================================
 
-const ProspectsView = ({ data, setData }) => {
+const ProspectsView = ({ data, setData, confirmModal, setConfirmModal }) => {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
@@ -224,13 +261,17 @@ const ProspectsView = ({ data, setData }) => {
     setShowForm(false);
   };
 
-  const handleDelete = (id) => {
-    if (confirm('Êtes-vous sûr?')) {
-      setData({
-        ...data,
-        prospects: data.prospects.filter(p => p.id !== id)
-      });
-    }
+  const handleDeleteClick = (id, nom) => {
+    setConfirmModal({
+      show: true,
+      message: `Êtes-vous sûr de vouloir supprimer "${nom}"?`,
+      onConfirm: () => {
+        setData({
+          ...data,
+          prospects: data.prospects.filter(p => p.id !== id)
+        });
+      }
+    });
   };
 
   const handleEdit = (prospect) => {
@@ -366,7 +407,7 @@ const ProspectsView = ({ data, setData }) => {
                       <Edit2 size={16} />
                     </button>
                     <button
-                      onClick={() => handleDelete(prospect.id)}
+                      onClick={() => handleDeleteClick(prospect.id, prospect.nom)}
                       className="p-2 hover:bg-red-100 rounded transition text-red-600"
                     >
                       <Trash2 size={16} />
@@ -517,7 +558,7 @@ const CalendarView = ({ data }) => {
 // SETTINGS VIEW - GÉRER LES DONNÉES
 // ============================================================================
 
-const SettingsView = ({ setData }) => {
+const SettingsView = ({ setData, confirmModal, setConfirmModal }) => {
   const handleExportJSON = () => {
     const saved = localStorage.getItem('eventix_data');
     const dataStr = JSON.stringify(JSON.parse(saved), null, 2);
@@ -530,12 +571,15 @@ const SettingsView = ({ setData }) => {
     document.body.removeChild(element);
   };
 
-  const handleResetData = () => {
-    if (confirm('Êtes-vous sûr de vouloir réinitialiser toutes les données?')) {
-      setData(INITIAL_DATA);
-      localStorage.setItem('eventix_data', JSON.stringify(INITIAL_DATA));
-      alert('Données réinitialisées');
-    }
+  const handleResetClick = () => {
+    setConfirmModal({
+      show: true,
+      message: 'Êtes-vous sûr de vouloir réinitialiser toutes les données?',
+      onConfirm: () => {
+        setData(INITIAL_DATA);
+        localStorage.setItem('eventix_data', JSON.stringify(INITIAL_DATA));
+      }
+    });
   };
 
   return (
@@ -564,7 +608,7 @@ const SettingsView = ({ setData }) => {
             Revenir aux données d'exemple initiales
           </p>
           <button
-            onClick={handleResetData}
+            onClick={handleResetClick}
             className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
           >
             Réinitialiser
