@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Calendar, Users, FileText, BarChart3, 
-  ChevronDown, Plus, TrendingUp, Trash2, Edit2, File, Download
+  Plus, TrendingUp, Trash2, Edit2, Download
 } from 'lucide-react';
 
 const App = () => {
@@ -14,7 +14,6 @@ const App = () => {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [selectedClientForDocs, setSelectedClientForDocs] = useState(null);
   const [showDocForm, setShowDocForm] = useState(false);
-  const [editingDoc, setEditingDoc] = useState(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [searchTerm, setSearchTerm] = useState('');
 
