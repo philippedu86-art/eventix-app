@@ -1,8 +1,6 @@
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 html {
   scroll-behavior: smooth;
@@ -21,20 +19,19 @@ body {
   min-height: 100vh;
 }
 
-button {
-  cursor: pointer;
-  transition: all 0.3s ease;
+::-webkit-scrollbar {
+  width: 8px;
 }
 
-button:hover:not(:disabled) {
-  transform: translateY(-1px);
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
 }
 
-input, select, textarea {
-  font-family: inherit;
-  font-size: inherit;
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
 }
 
-table {
-  border-collapse: collapse;
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
