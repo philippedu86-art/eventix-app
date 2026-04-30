@@ -34,3 +34,7 @@ input, select, textarea {
   font-family: inherit;
   font-size: inherit;
 }
+
+table {
+  border-collapse: collapse;
+}
