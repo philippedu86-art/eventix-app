@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Calendar, Users, FileText, BarChart3, 
-  Plus, TrendingUp, Trash2, Edit2, Download, ChevronLeft, ChevronRight, Check
+  Plus, TrendingUp, Trash2, Edit2, Download, ChevronLeft, ChevronRight
 } from 'lucide-react';
 
 // ===== IMPORT DONNÉES EXCEL (152 clients - premiers 10 pour démo)
@@ -168,7 +168,6 @@ const App = () => {
   };
 
   const toggleSelectAll = (clientsOnPage) => {
-    const pageIds = new Set(clientsOnPage.map(c => c.id));
     const newSelected = new Set(selectedClients);
     
     const allSelected = clientsOnPage.every(c => newSelected.has(c.id));
