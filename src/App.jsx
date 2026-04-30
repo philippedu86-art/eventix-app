@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
 import { 
   Calendar, Users, FileText, Package, BarChart3, 
-  ChevronDown, Plus, Edit2, Trash2, 
-  X, MapPin, Phone, Mail, DollarSign, Check, 
-  Clock, AlertCircle, TrendingUp, Eye
+  ChevronDown, Plus, TrendingUp, Eye
 } from 'lucide-react';
 
 const EventixApp = () => {
