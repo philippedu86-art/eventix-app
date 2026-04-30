@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Calendar, Users, FileText, BarChart3, 
-  Plus, TrendingUp, Trash2, Edit2, Download
+  Plus, TrendingUp, Trash2, Edit2, Download, ChevronLeft, ChevronRight, Check
 } from 'lucide-react';
 
 // ===== IMPORT DONNÉES EXCEL (152 clients - premiers 10 pour démo)
@@ -24,13 +24,21 @@ const App = () => {
   const [documents, setDocuments] = useState([]);
   const [showClientForm, setShowClientForm] = useState(false);
   const [editingClient, setEditingClient] = useState(null);
-  const [formMode, setFormMode] = useState('add'); // 'add' ou 'edit'
+  const [formMode, setFormMode] = useState('add');
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [selectedClientForDocs, setSelectedClientForDocs] = useState(null);
   const [showDocForm, setShowDocForm] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [searchTerm, setSearchTerm] = useState('');
+
+  // ===== ÉTATS POUR PAGINATION ET SÉLECTION MULTIPLE
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [selectedClients, setSelectedClients] = useState(new Set());
+  const [bulkAction, setBulkAction] = useState('');
+  const [bulkActionValue, setBulkActionValue] = useState('');
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
 
   const [formData, setFormData] = useState({
     nom: '',
@@ -47,7 +55,7 @@ const App = () => {
     pays: '',
     website: '',
     devise: 'CAD',
-    type: 'Entreprise', // Nouveau: type client
+    type: 'Entreprise',
     montant: 0,
     stage: 'client',
     notes: ''
@@ -148,6 +156,60 @@ const App = () => {
     setDeleteTarget(null);
   };
 
+  // ===== GESTION SÉLECTION MULTIPLE
+  const toggleClientSelection = (id) => {
+    const newSelected = new Set(selectedClients);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedClients(newSelected);
+  };
+
+  const toggleSelectAll = (clientsOnPage) => {
+    const pageIds = new Set(clientsOnPage.map(c => c.id));
+    const newSelected = new Set(selectedClients);
+    
+    const allSelected = clientsOnPage.every(c => newSelected.has(c.id));
+    
+    if (allSelected) {
+      clientsOnPage.forEach(c => newSelected.delete(c.id));
+    } else {
+      clientsOnPage.forEach(c => newSelected.add(c.id));
+    }
+    setSelectedClients(newSelected);
+  };
+
+  // ===== ACTIONS EN MASSE
+  const handleBulkAction = () => {
+    if (selectedClients.size === 0) {
+      alert('Sélectionnez au moins un client');
+      return;
+    }
+
+    if (bulkAction === 'delete') {
+      setShowBulkDeleteConfirm(true);
+    } else if (bulkAction === 'stage' && bulkActionValue) {
+      const updatedClients = clients.map(c => 
+        selectedClients.has(c.id) ? { ...c, stage: bulkActionValue } : c
+      );
+      setClients(updatedClients);
+      setSelectedClients(new Set());
+      setBulkAction('');
+      setBulkActionValue('');
+      alert(`${selectedClients.size} client(s) mis à jour`);
+    }
+  };
+
+  const confirmBulkDelete = () => {
+    setClients(clients.filter(c => !selectedClients.has(c.id)));
+    setDocuments(documents.filter(d => !selectedClients.has(d.clientId)));
+    setSelectedClients(new Set());
+    setBulkAction('');
+    setShowBulkDeleteConfirm(false);
+  };
+
   const handleAddDocument = () => {
     if (!docForm.nom.trim() || !selectedClientForDocs) {
       alert('Entrez le nom du document et sélectionnez un client');
@@ -184,142 +246,62 @@ const App = () => {
   const ClientFormModal = () => (
     showClientForm && (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-lg shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-96 overflow-y-auto">
           <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-800 text-white p-6 flex justify-between items-center">
-            <h3 className="text-xl font-semibold">
-              {formMode === 'add' ? '➕ Nouveau Client' : '✏️ Modifier Client'}
-            </h3>
-            <button
-              onClick={() => { setShowClientForm(false); setFormMode('add'); resetFormData(); }}
-              className="text-2xl leading-none hover:text-gray-200 transition"
-            >
-              ✕
-            </button>
+            <h2 className="text-2xl font-bold">{formMode === 'add' ? 'Ajouter Client' : 'Modifier Client'}</h2>
+            <button onClick={() => { setShowClientForm(false); resetFormData(); }} className="text-2xl hover:text-blue-200">×</button>
           </div>
-
+          
           <div className="p-6 space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nom *</label>
-                <input type="text" placeholder="Nom" value={formData.nom} onChange={(e) => setFormData({...formData, nom: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Prénom</label>
-                <input type="text" placeholder="Prénom" value={formData.prenom} onChange={(e) => setFormData({...formData, prenom: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nom de famille</label>
-                <input type="text" placeholder="Nom de famille" value={formData.nomFamille} onChange={(e) => setFormData({...formData, nomFamille: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Type Client *</label>
-                <select value={formData.type} onChange={(e) => setFormData({...formData, type: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="Entreprise">🏢 Entreprise</option>
-                  <option value="Particulier">👤 Particulier</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                <input type="email" placeholder="Email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Téléphone</label>
-                <input type="tel" placeholder="Téléphone" value={formData.telephone} onChange={(e) => setFormData({...formData, telephone: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Mobile</label>
-                <input type="tel" placeholder="Mobile" value={formData.mobile} onChange={(e) => setFormData({...formData, mobile: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Adresse 1</label>
-                <input type="text" placeholder="Adresse 1" value={formData.adresse1} onChange={(e) => setFormData({...formData, adresse1: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Adresse 2</label>
-                <input type="text" placeholder="Adresse 2" value={formData.adresse2} onChange={(e) => setFormData({...formData, adresse2: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Ville</label>
-                <input type="text" placeholder="Ville" value={formData.ville} onChange={(e) => setFormData({...formData, ville: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Province</label>
-                <input type="text" placeholder="Province" value={formData.province} onChange={(e) => setFormData({...formData, province: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Code Postal</label>
-                <input type="text" placeholder="Code Postal" value={formData.codePostal} onChange={(e) => setFormData({...formData, codePostal: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Pays</label>
-                <input type="text" placeholder="Pays" value={formData.pays} onChange={(e) => setFormData({...formData, pays: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Website</label>
-                <input type="url" placeholder="Website" value={formData.website} onChange={(e) => setFormData({...formData, website: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Devise</label>
-                <select value={formData.devise} onChange={(e) => setFormData({...formData, devise: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="CAD">CAD</option>
-                  <option value="USD">USD</option>
-                  <option value="EUR">EUR</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Étape</label>
-                <select value={formData.stage} onChange={(e) => setFormData({...formData, stage: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="client">Client</option>
-                  <option value="devis">Devis</option>
-                  <option value="contrat">Contrat</option>
-                  <option value="facture">Facturé</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Montant</label>
-                <input type="number" placeholder="Montant" value={formData.montant} onChange={(e) => setFormData({...formData, montant: parseFloat(e.target.value) || 0})} className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-              <textarea placeholder="Notes" value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" rows="3" />
+            <div className="grid grid-cols-2 gap-4">
+              <input type="text" placeholder="Nom*" value={formData.nom} onChange={(e) => setFormData({...formData, nom: e.target.value})} className="col-span-2 px-3 py-2 border rounded" />
+              <input type="text" placeholder="Prénom" value={formData.prenom} onChange={(e) => setFormData({...formData, prenom: e.target.value})} className="px-3 py-2 border rounded" />
+              <input type="text" placeholder="Nom de Famille" value={formData.nomFamille} onChange={(e) => setFormData({...formData, nomFamille: e.target.value})} className="px-3 py-2 border rounded" />
+              <input type="email" placeholder="Email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="px-3 py-2 border rounded" />
+              <input type="tel" placeholder="Téléphone" value={formData.telephone} onChange={(e) => setFormData({...formData, telephone: e.target.value})} className="px-3 py-2 border rounded" />
+              <input type="tel" placeholder="Mobile" value={formData.mobile} onChange={(e) => setFormData({...formData, mobile: e.target.value})} className="px-3 py-2 border rounded" />
+              <input type="text" placeholder="Adresse 1" value={formData.adresse1} onChange={(e) => setFormData({...formData, adresse1: e.target.value})} className="col-span-2 px-3 py-2 border rounded" />
+              <input type="text" placeholder="Adresse 2" value={formData.adresse2} onChange={(e) => setFormData({...formData, adresse2: e.target.value})} className="col-span-2 px-3 py-2 border rounded" />
+              <input type="text" placeholder="Ville" value={formData.ville} onChange={(e) => setFormData({...formData, ville: e.target.value})} className="px-3 py-2 border rounded" />
+              <input type="text" placeholder="Province" value={formData.province} onChange={(e) => setFormData({...formData, province: e.target.value})} className="px-3 py-2 border rounded" />
+              <input type="text" placeholder="Code Postal" value={formData.codePostal} onChange={(e) => setFormData({...formData, codePostal: e.target.value})} className="px-3 py-2 border rounded" />
+              <input type="text" placeholder="Pays" value={formData.pays} onChange={(e) => setFormData({...formData, pays: e.target.value})} className="px-3 py-2 border rounded" />
+              <select value={formData.type} onChange={(e) => setFormData({...formData, type: e.target.value})} className="px-3 py-2 border rounded">
+                <option value="Entreprise">Entreprise</option>
+                <option value="Particulier">Particulier</option>
+              </select>
+              <select value={formData.stage} onChange={(e) => setFormData({...formData, stage: e.target.value})} className="px-3 py-2 border rounded">
+                <option value="client">Client</option>
+                <option value="devis">Devis</option>
+                <option value="contrat">Contrat</option>
+                <option value="facture">Facture</option>
+              </select>
+              <textarea placeholder="Notes" value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} className="col-span-2 px-3 py-2 border rounded h-20" />
             </div>
           </div>
-
-          <div className="sticky bottom-0 bg-gray-100 p-4 flex gap-3 justify-end border-t">
-            <button
-              onClick={() => { setShowClientForm(false); setFormMode('add'); resetFormData(); }}
-              className="flex-1 bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded font-medium transition"
-            >
-              ❌ Annuler
-            </button>
-            <button
-              onClick={formMode === 'add' ? handleAddClient : handleEditClient}
-              className="flex-1 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded font-medium transition"
-            >
-              {formMode === 'add' ? '✅ Ajouter' : '✅ Sauvegarder'}
-            </button>
+          
+          <div className="bg-gray-100 p-4 flex gap-2 justify-end sticky bottom-0">
+            <button onClick={() => { setShowClientForm(false); resetFormData(); }} className="px-4 py-2 bg-gray-400 hover:bg-gray-500 text-white rounded font-medium">Annuler</button>
+            <button onClick={formMode === 'add' ? handleAddClient : handleEditClient} className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded font-medium">{formMode === 'add' ? 'Ajouter' : 'Mettre à jour'}</button>
           </div>
         </div>
       </div>
     )
   );
 
-  // ===== CONFIRMATION MODAL
   const ConfirmModal = () => (
-    showConfirmModal && (
+    (showConfirmModal || showBulkDeleteConfirm) && (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-6 shadow-lg max-w-sm">
-          <h2 className="text-lg font-semibold mb-4">Confirmer la suppression</h2>
-          <p className="text-gray-600 mb-6">Cette action est irréversible. Les documents associés seront également supprimés.</p>
-          <div className="flex gap-3">
-            <button onClick={confirmDelete} className="flex-1 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded font-medium transition">
-              🗑️ Supprimer
-            </button>
-            <button onClick={() => setShowConfirmModal(false)} className="flex-1 bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded font-medium transition">
-              ❌ Annuler
-            </button>
+        <div className="bg-white rounded-lg shadow-xl p-6 max-w-sm">
+          <h3 className="text-lg font-semibold mb-4">Confirmation de suppression</h3>
+          <p className="text-gray-600 mb-6">
+            {showBulkDeleteConfirm 
+              ? `Êtes-vous sûr de vouloir supprimer ${selectedClients.size} client(s)? Cette action est irréversible.`
+              : 'Êtes-vous sûr de vouloir supprimer ce client? Cette action est irréversible.'}
+          </p>
+          <div className="flex gap-2 justify-end">
+            <button onClick={() => { setShowConfirmModal(false); setShowBulkDeleteConfirm(false); }} className="px-4 py-2 bg-gray-400 hover:bg-gray-500 text-white rounded font-medium">Annuler</button>
+            <button onClick={showBulkDeleteConfirm ? confirmBulkDelete : confirmDelete} className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded font-medium">Supprimer</button>
           </div>
         </div>
       </div>
@@ -329,144 +311,265 @@ const App = () => {
   const renderDashboard = () => (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg p-6 text-white">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-blue-100 text-sm font-medium">Total Clients</p>
-              <p className="text-4xl font-bold mt-2">{clients.length}</p>
-            </div>
-            <Users className="w-8 h-8 opacity-50" />
-          </div>
+        <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-lg p-6 shadow-md">
+          <p className="text-sm opacity-90">Total Clients</p>
+          <p className="text-4xl font-bold">{clients.length}</p>
         </div>
-        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-lg p-6 text-white">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-green-100 text-sm font-medium">Facturés</p>
-              <p className="text-4xl font-bold mt-2">{clients.filter(c => c.stage === 'facture').length}</p>
-            </div>
-            <TrendingUp className="w-8 h-8 opacity-50" />
-          </div>
+        <div className="bg-gradient-to-br from-green-500 to-green-600 text-white rounded-lg p-6 shadow-md">
+          <p className="text-sm opacity-90">Entreprises</p>
+          <p className="text-4xl font-bold">{clients.filter(c => c.type === 'Entreprise').length}</p>
         </div>
-        <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg p-6 text-white">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-purple-100 text-sm font-medium">Documents</p>
-              <p className="text-4xl font-bold mt-2">{documents.length}</p>
-            </div>
-            <FileText className="w-8 h-8 opacity-50" />
-          </div>
+        <div className="bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-lg p-6 shadow-md">
+          <p className="text-sm opacity-90">Particuliers</p>
+          <p className="text-4xl font-bold">{clients.filter(c => c.type === 'Particulier').length}</p>
         </div>
-        <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg p-6 text-white">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-orange-100 text-sm font-medium">Entreprises</p>
-              <p className="text-4xl font-bold mt-2">{clients.filter(c => c.type === 'Entreprise').length}</p>
-            </div>
-            <BarChart3 className="w-8 h-8 opacity-50" />
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold mb-4">Top Clients</h3>
-          <div className="space-y-3">
-            {clients.slice(0, 5).map(c => (
-              <div key={c.id} className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                <div>
-                  <p className="font-medium">{c.nom}</p>
-                  <p className="text-sm text-gray-500">{c.email}</p>
-                </div>
-                <span className={`px-2 py-1 rounded text-xs font-semibold ${c.type === 'Entreprise' ? 'bg-purple-100 text-purple-700' : 'bg-orange-100 text-orange-700'}`}>
-                  {c.type}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold mb-4">Répartition par Étape</h3>
-          <div className="space-y-3">
-            {['client', 'devis', 'contrat', 'facture'].map(stage => {
-              const count = clients.filter(c => c.stage === stage).length;
-              const percent = clients.length > 0 ? (count / clients.length * 100).toFixed(0) : 0;
-              return (
-                <div key={stage} className="space-y-1">
-                  <div className="flex justify-between text-sm">
-                    <span className="capitalize font-medium">{stage}</span>
-                    <span>{count}</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div className="bg-blue-500 h-2 rounded-full" style={{ width: `${percent}%` }}></div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+        <div className="bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-lg p-6 shadow-md">
+          <p className="text-sm opacity-90">Documents</p>
+          <p className="text-4xl font-bold">{documents.length}</p>
         </div>
       </div>
     </div>
   );
 
-  const renderClients = () => (
-    <div className="space-y-4">
-      <button
-        onClick={handleOpenAddForm}
-        className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium transition"
-      >
-        <Plus className="w-5 h-5" /> Ajouter Client
-      </button>
+  // ===== RENDU CLIENTS AVEC PAGINATION ET TABLEAU
+  const renderClients = () => {
+    const filteredClients = clients.filter(c => 
+      c.nom.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      c.email.toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
-      <input
-        type="text"
-        placeholder="Rechercher par nom, email..."
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-        className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-      />
+    const totalPages = Math.ceil(filteredClients.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const clientsOnPage = filteredClients.slice(startIndex, endIndex);
+    const allClientOnPageSelected = clientsOnPage.length > 0 && clientsOnPage.every(c => selectedClients.has(c.id));
 
-      <div className="space-y-2">
-        {clients
-          .filter(c => c.nom.toLowerCase().includes(searchTerm.toLowerCase()) || c.email.toLowerCase().includes(searchTerm.toLowerCase()))
-          .map(client => (
-            <div key={client.id} className="bg-white rounded-lg shadow p-4 flex justify-between items-start gap-4">
-              <div className="flex-1">
-                <p className="font-semibold text-lg">{client.nom}</p>
-                {client.prenom && <p className="text-sm text-gray-600">{client.prenom} {client.nomFamille}</p>}
-                <p className="text-sm text-gray-500">{client.email}</p>
-                {client.telephone && <p className="text-sm text-gray-500">📞 {client.telephone}</p>}
-                <div className="flex gap-2 mt-2 flex-wrap">
-                  <span className={`px-2 py-1 rounded text-xs font-semibold ${client.type === 'Entreprise' ? 'bg-purple-100 text-purple-700' : 'bg-orange-100 text-orange-700'}`}>
-                    {client.type === 'Entreprise' ? '🏢' : '👤'} {client.type}
-                  </span>
-                  <span className="px-2 py-1 rounded text-xs font-semibold bg-blue-100 text-blue-700">
-                    {client.stage}
-                  </span>
-                  <span className="px-2 py-1 rounded text-xs font-semibold bg-gray-100 text-gray-700">
-                    📄 {documents.filter(d => d.clientId === client.id).length} docs
-                  </span>
-                </div>
-              </div>
-              <div className="flex flex-col gap-2">
-                <button
-                  onClick={() => handleOpenEditForm(client)}
-                  className="flex items-center gap-1 bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded text-sm font-medium transition"
-                >
-                  <Edit2 className="w-4 h-4" /> Modifier
-                </button>
-                <button
-                  onClick={() => handleDeleteClient(client.id)}
-                  className="flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded text-sm font-medium transition"
-                >
-                  <Trash2 className="w-4 h-4" /> Supprimer
-                </button>
-              </div>
+    return (
+      <div className="space-y-4">
+        {/* BARRE DE CONTRÔLE */}
+        <div className="bg-white rounded-lg shadow p-4 space-y-3">
+          <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+            <div className="flex-1 flex gap-2 items-center">
+              <input 
+                type="text" 
+                placeholder="🔍 Rechercher par nom ou email..." 
+                value={searchTerm} 
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="flex-1 px-4 py-2 border rounded-lg"
+              />
+              <button
+                onClick={handleOpenAddForm}
+                className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-medium transition"
+              >
+                <Plus className="w-5 h-5" /> Ajouter
+              </button>
             </div>
-          ))}
+          </div>
+
+          {/* OPTIONS PAGINATION ET SÉLECTION */}
+          <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between border-t pt-3">
+            <div className="flex gap-2 items-center">
+              <label className="text-sm font-medium">Lignes par page:</label>
+              <select 
+                value={itemsPerPage} 
+                onChange={(e) => {
+                  setItemsPerPage(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="px-3 py-1 border rounded text-sm"
+              >
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+              </select>
+              <span className="text-sm text-gray-600">
+                {filteredClients.length > 0 ? `${startIndex + 1}-${Math.min(endIndex, filteredClients.length)}` : '0'} sur {filteredClients.length}
+              </span>
+            </div>
+
+            {selectedClients.size > 0 && (
+              <div className="flex gap-2 items-center bg-blue-50 p-3 rounded-lg">
+                <span className="text-sm font-medium">{selectedClients.size} sélectionné(s)</span>
+                <select 
+                  value={bulkAction} 
+                  onChange={(e) => setBulkAction(e.target.value)}
+                  className="px-2 py-1 border rounded text-sm"
+                >
+                  <option value="">-- Action --</option>
+                  <option value="stage">Changer le statut</option>
+                  <option value="delete">Supprimer</option>
+                </select>
+                {bulkAction === 'stage' && (
+                  <select 
+                    value={bulkActionValue} 
+                    onChange={(e) => setBulkActionValue(e.target.value)}
+                    className="px-2 py-1 border rounded text-sm"
+                  >
+                    <option value="">-- Statut --</option>
+                    <option value="client">Client</option>
+                    <option value="devis">Devis</option>
+                    <option value="contrat">Contrat</option>
+                    <option value="facture">Facture</option>
+                  </select>
+                )}
+                <button
+                  onClick={handleBulkAction}
+                  className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm font-medium transition"
+                >
+                  Appliquer
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* TABLEAU CLIENTS */}
+        <div className="bg-white rounded-lg shadow overflow-x-auto">
+          <table className="w-full border-collapse">
+            <thead className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
+              <tr>
+                <th className="px-4 py-3 text-left text-sm font-semibold w-8">
+                  <input 
+                    type="checkbox" 
+                    checked={allClientOnPageSelected}
+                    onChange={() => toggleSelectAll(clientsOnPage)}
+                    className="w-4 h-4 cursor-pointer"
+                  />
+                </th>
+                <th className="px-4 py-3 text-left text-sm font-semibold">Nom</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold">Email</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold">Téléphone</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold">Type</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold">Statut</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold">Docs</th>
+                <th className="px-4 py-3 text-center text-sm font-semibold">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {clientsOnPage.map(client => (
+                <tr key={client.id} className={`hover:bg-blue-50 transition ${selectedClients.has(client.id) ? 'bg-blue-100' : ''}`}>
+                  <td className="px-4 py-3">
+                    <input 
+                      type="checkbox" 
+                      checked={selectedClients.has(client.id)}
+                      onChange={() => toggleClientSelection(client.id)}
+                      className="w-4 h-4 cursor-pointer"
+                    />
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="font-semibold text-gray-900">{client.nom}</div>
+                    {(client.prenom || client.nomFamille) && (
+                      <div className="text-xs text-gray-500">{client.prenom} {client.nomFamille}</div>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-700">{client.email}</td>
+                  <td className="px-4 py-3 text-sm text-gray-700">{client.telephone || '-'}</td>
+                  <td className="px-4 py-3">
+                    <span className={`px-2 py-1 rounded text-xs font-semibold ${client.type === 'Entreprise' ? 'bg-purple-100 text-purple-700' : 'bg-orange-100 text-orange-700'}`}>
+                      {client.type === 'Entreprise' ? '🏢' : '👤'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                      client.stage === 'client' ? 'bg-green-100 text-green-700' :
+                      client.stage === 'devis' ? 'bg-yellow-100 text-yellow-700' :
+                      client.stage === 'contrat' ? 'bg-blue-100 text-blue-700' :
+                      'bg-red-100 text-red-700'
+                    }`}>
+                      {client.stage}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-700 text-center">
+                    {documents.filter(d => d.clientId === client.id).length}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <div className="flex justify-center gap-2">
+                      <button
+                        onClick={() => handleOpenEditForm(client)}
+                        className="p-2 bg-blue-500 hover:bg-blue-600 text-white rounded transition"
+                        title="Modifier"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteClient(client.id)}
+                        className="p-2 bg-red-500 hover:bg-red-600 text-white rounded transition"
+                        title="Supprimer"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* PAGINATION */}
+        {totalPages > 1 && (
+          <div className="bg-white rounded-lg shadow p-4 flex justify-between items-center">
+            <div className="text-sm text-gray-600">
+              Page {currentPage} sur {totalPages}
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+                className="flex items-center gap-2 px-3 py-2 bg-gray-200 hover:bg-gray-300 disabled:opacity-50 rounded-lg transition"
+              >
+                <ChevronLeft className="w-4 h-4" /> Précédent
+              </button>
+              
+              {/* NUMÉROS DE PAGE */}
+              <div className="flex gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(page => Math.abs(page - currentPage) <= 2 || page === 1 || page === totalPages)
+                  .map((page, idx, arr) => {
+                    if (idx > 0 && arr[idx - 1] !== page - 1) {
+                      return (
+                        <span key={`dots-${idx}`} className="px-2 py-2">...</span>
+                      );
+                    }
+                    return (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`px-3 py-2 rounded-lg transition ${
+                          currentPage === page 
+                            ? 'bg-blue-500 text-white font-semibold' 
+                            : 'bg-gray-200 hover:bg-gray-300'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    );
+                  })}
+              </div>
+
+              <button
+                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                disabled={currentPage === totalPages}
+                className="flex items-center gap-2 px-3 py-2 bg-gray-200 hover:bg-gray-300 disabled:opacity-50 rounded-lg transition"
+              >
+                Suivant <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {clientsOnPage.length === 0 && (
+          <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
+            {searchTerm ? '❌ Aucun client trouvé' : '📋 Aucun client pour le moment'}
+          </div>
+        )}
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderDocuments = () => (
     <div className="space-y-4">
@@ -489,28 +592,19 @@ const App = () => {
             <option value="facture">Facture</option>
             <option value="autre">Autre</option>
           </select>
-          <textarea placeholder="Contenu" value={docForm.contenu} onChange={(e) => setDocForm({...docForm, contenu: e.target.value})} className="w-full px-3 py-2 border rounded" rows="5" />
+          <textarea placeholder="Contenu du document" value={docForm.contenu} onChange={(e) => setDocForm({...docForm, contenu: e.target.value})} className="w-full px-3 py-2 border rounded h-32" />
           <div className="flex gap-2">
-            <button onClick={handleAddDocument} className="flex-1 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded font-medium transition">
-              Ajouter
-            </button>
-            <button onClick={() => setShowDocForm(false)} className="flex-1 bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded font-medium transition">
-              Annuler
-            </button>
+            <button onClick={handleAddDocument} className="flex-1 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-medium transition">✓ Ajouter Document</button>
+            <button onClick={() => setShowDocForm(false)} className="flex-1 bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded-lg font-medium transition">Annuler</button>
           </div>
         </div>
       )}
 
-      {!showDocForm && (
-        <button
-          onClick={() => setShowDocForm(true)}
-          className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-medium transition"
-        >
-          <Plus className="w-5 h-5" /> Ajouter Document
-        </button>
-      )}
+      <button onClick={() => setShowDocForm(true)} className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-medium transition">
+        <Plus className="w-5 h-5" /> Nouveau Document
+      </button>
 
-      <div className="space-y-2">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {documents.map(doc => {
           const client = clients.find(c => c.id === doc.clientId);
           return (
@@ -653,8 +747,8 @@ const App = () => {
     <div className="min-h-screen bg-gray-100">
       <nav className="bg-gradient-to-r from-blue-600 to-blue-800 text-white shadow-lg">
         <div className="max-w-7xl mx-auto px-4 py-4">
-          <h1 className="text-2xl font-bold">📊 Eventix CRM V7</h1>
-          <p className="text-sm text-blue-100">Avec Modal Popup & Type Client</p>
+          <h1 className="text-2xl font-bold">📊 Eventix CRM V8</h1>
+          <p className="text-sm text-blue-100">Avec Pagination, Tableau & Sélection Multiple</p>
         </div>
       </nav>
 
