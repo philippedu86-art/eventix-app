@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Calendar, Users, FileText, Package, BarChart3, 
-  ChevronDown, Plus, TrendingUp, Eye, Trash2, Edit2, X
+  Calendar, Users, FileText, BarChart3, 
+  ChevronDown, Plus, TrendingUp, Trash2, Edit2
 } from 'lucide-react';
 
 // ============================================================================
@@ -427,7 +427,7 @@ const ProspectsView = ({ data, setData, confirmModal, setConfirmModal }) => {
 // PIPELINE VIEW - KANBAN
 // ============================================================================
 
-const PipelineView = ({ data, setData }) => {
+const PipelineView = ({ data }) => {
   const stages = [
     { id: 'prospect', title: 'Prospects', color: 'blue' },
     { id: 'devis', title: 'Devis', color: 'amber' },
