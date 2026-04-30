@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Calendar, Users, FileText, BarChart3, 
-  ChevronDown, Plus, TrendingUp, Trash2, Edit2, File, Download, X
+  ChevronDown, Plus, TrendingUp, Trash2, Edit2, File, Download
 } from 'lucide-react';
 
 // ============================================================================
